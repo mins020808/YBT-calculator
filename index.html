@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Y-Balance Test Pro Analytics</title>
-    <!-- Chart.js 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -130,7 +129,6 @@
         .checkbox-group input[type="radio"] { width: auto; margin-right: 5px; }
         .checkbox-group label { margin: 0; font-weight: normal; cursor: pointer; display: inline-flex; align-items: center; }
 
-        /* 수정: 6개 열로 분할 (라벨 + 1,2,3회차 + 최고값 + 평균) */
         .measurement-row {
             display: grid;
             grid-template-columns: 90px 1fr 1fr 1fr 75px 75px;
@@ -217,7 +215,6 @@
             .measurement-row > div:nth-child(5) { grid-column: 1 / 2; margin-top: 5px; position:relative; }
             .measurement-row > div:nth-child(6) { grid-column: 2 / 4; margin-top: 5px; position:relative; }
             
-            /* 모바일에서 최고값, 평균 구분을 위해 가상요소 추가 */
             .measurement-row > div:nth-child(5)::before { content: "최고:"; font-size:0.75rem; position:absolute; top:-15px; left:5px; color:#666; font-weight:normal;}
             .measurement-row > div:nth-child(6)::before { content: "평균:"; font-size:0.75rem; position:absolute; top:-15px; left:5px; color:#666; font-weight:normal;}
 
@@ -230,9 +227,8 @@
 
 <div class="container">
     <h1>YBT Pro Analytics</h1>
-    <div class="subtitle">종합 부상 위험도 및 신체 불균형 평가 시스템 (V5.0)</div>
+    <div class="subtitle">종합 부상 위험도 및 신체 불균형 평가 시스템 (V6.0)</div>
 
-    <!-- 1. 기본 정보 -->
     <div class="section">
         <h2>1. 평가자 정보 및 당일 컨디션
             <button class="btn-secondary" onclick="downloadCSV()" id="downloadBtn" style="font-size: 0.8rem; display:none;">📊 누적 데이터 다운로드</button>
@@ -280,7 +276,6 @@
         </div>
     </div>
 
-    <!-- 2. 신체 측정 -->
     <div class="section">
         <h2>2. 다리 길이 (ASIS ~ 내측 복사뼈)</h2>
         <div class="grid-2">
@@ -295,7 +290,6 @@
         </div>
     </div>
 
-    <!-- 3. 우측 다리 측정 -->
     <div class="section">
         <h2>3. 우측 지지발 (Right Stance) <span id="r-alert" style="color:var(--danger); font-size:0.8rem; font-weight:normal;"></span></h2>
         <div class="measurement-row measurement-header">
@@ -318,7 +312,6 @@
         </div>
     </div>
 
-    <!-- 4. 좌측 다리 측정 -->
     <div class="section">
         <h2>4. 좌측 지지발 (Left Stance) <span id="l-alert" style="color:var(--danger); font-size:0.8rem; font-weight:normal;"></span></h2>
         <div class="measurement-row measurement-header">
@@ -343,7 +336,6 @@
 
     <button class="btn-primary" onclick="analyzeResults()">분석 결과 확인</button>
 
-    <!-- 결과 창 -->
     <div id="result-section">
         <div id="result-header" class="result-header">
             <h2 style="color:white; border:none; margin:0; justify-content:center; font-size:1.8rem;" id="result-title">결과 분석중...</h2>
@@ -416,11 +408,9 @@
             alertSpan.innerText = "";
         }
 
-        // 최고값 산출
         const maxVal = Math.max(v1, v2, v3);
         document.getElementById(prefix + '-max').innerText = maxVal > 0 ? maxVal.toFixed(1) : "0.0";
         
-        // 평균 산출 (값이 입력된 횟수만큼만 나눠서 계산)
         let sum = 0;
         let count = 0;
         if (v1 > 0) { sum += v1; count++; }
@@ -440,7 +430,6 @@
 
         if (!legR || !legL) { alert("좌우 다리 길이를 정확히 입력해주세요."); return; }
 
-        // analyzeResults에서는 여전히 부상 판별의 공식 기준인 '최고값'을 끌고 옵니다.
         const r_at = parseFloat(document.getElementById('r-at-max').innerText) || 0;
         const r_pm = parseFloat(document.getElementById('r-pm-max').innerText) || 0;
         const r_pl = parseFloat(document.getElementById('r-pl-max').innerText) || 0;
@@ -485,38 +474,57 @@
         const isFatigued = (sleep === 'bad' || workout === 'heavy');
         document.getElementById('cns-alert').style.display = isFatigued ? 'block' : 'none';
 
-        let riskLevel = "safe";
+        let isDanger = false;
+        let isWarning = false;
         let solutions = [];
+        let dangerTags = [];
+        let warningTags = [];
 
+        // 1. 점수 기반 판별
         if (r_score < targetCutoff || l_score < targetCutoff) {
-            riskLevel = "warning";
-            if (r_score < targetCutoff - 5 || l_score < targetCutoff - 5) riskLevel = "danger";
+            isWarning = true;
+            if (r_score < targetCutoff - 5 || l_score < targetCutoff - 5) {
+                isDanger = true;
+                dangerTags.push("전신 밸런스 저하");
+            } else {
+                warningTags.push("종합 밸런스 저하");
+            }
         }
         
+        // 2. 전방 (AT) 판별
         if (diff_at > 4.0) {
-            riskLevel = "danger"; diffAtEl.className = 'danger-text';
+            isDanger = true; diffAtEl.className = 'danger-text';
+            dangerTags.push("발목/무릎 과부하");
             solutions.push("<li><b>전방(AT) 고위험:</b> 발목 배측굴곡 제한 및 코어 전면부 제어 상실. <br>→ 추천: 카프 스트레칭, 하프 닐링 발목 모빌리티, 비복근 이완</li>");
         } else if (diff_at > 2.0) {
-            if(riskLevel === "safe") riskLevel = "warning";
-            diffAtEl.className = 'warning-text';
+            isWarning = true; diffAtEl.className = 'warning-text';
+            warningTags.push("전방 밸런스 주의");
         }
 
-        if (diff_pm > 6.0) {
-            riskLevel = "danger"; diffPmEl.className = 'danger-text';
-            solutions.push("<li><b>뒤내측(PM) 고위험:</b> 고관절 내/외회전 불안정 및 중둔근 약화. <br>→ 추천: 밴드 몬스터 워크, 싱글 레그 RDL</li>");
-        } else if (diff_pm > 4.0) {
-            if(riskLevel === "safe") riskLevel = "warning";
-            diffPmEl.className = 'warning-text';
+        // 3. 후방 (PM/PL) 판별
+        if (diff_pm > 6.0 || diff_pl > 6.0) {
+            isDanger = true;
+            dangerTags.push("전방 십자인대(ACL) 파열");
+            if(diff_pm > 6.0) {
+                diffPmEl.className = 'danger-text';
+                solutions.push("<li><b>뒤내측(PM) 고위험:</b> 고관절 내/외회전 불안정 및 중둔근 약화. <br>→ 추천: 밴드 몬스터 워크, 싱글 레그 RDL</li>");
+            }
+            if(diff_pl > 6.0) {
+                diffPlEl.className = 'danger-text';
+                solutions.push("<li><b>뒤외측(PL) 고위험:</b> 후면 사슬 약화 및 둔근 활성화 부족. <br>→ 추천: 힙 에어플레인(Hip Airplane), 불가리안 스플릿 스쿼트</li>");
+            }
         }
         
-        if (diff_pl > 6.0) {
-            riskLevel = "danger"; diffPlEl.className = 'danger-text';
-            solutions.push("<li><b>뒤외측(PL) 고위험:</b> 후면 사슬 약화 및 둔근 활성화 부족. <br>→ 추천: 힙 에어플레인(Hip Airplane), 불가리안 스플릿 스쿼트</li>");
-        } else if (diff_pl > 4.0) {
-            if(riskLevel === "safe") riskLevel = "warning";
-            diffPlEl.className = 'warning-text';
+        if (diff_pm > 4.0 && diff_pm <= 6.0) {
+            isWarning = true; diffPmEl.className = 'warning-text';
+            if(!warningTags.includes("후방 밸런스 주의")) warningTags.push("후방 밸런스 주의");
+        }
+        if (diff_pl > 4.0 && diff_pl <= 6.0) {
+            isWarning = true; diffPlEl.className = 'warning-text';
+            if(!warningTags.includes("후방 밸런스 주의")) warningTags.push("후방 밸런스 주의");
         }
 
+        // 스타일 및 타이틀 렌더링
         const resHeader = document.getElementById('result-header');
         const resBody = document.getElementById('result-body');
         const resTitle = document.getElementById('result-title');
@@ -524,22 +532,40 @@
         document.getElementById('r-score-box').style.borderColor = r_score < targetCutoff ? (r_score < targetCutoff - 5 ? 'var(--danger)' : 'var(--warning)') : 'var(--gray-200)';
         document.getElementById('l-score-box').style.borderColor = l_score < targetCutoff ? (l_score < targetCutoff - 5 ? 'var(--danger)' : 'var(--warning)') : 'var(--gray-200)';
 
-        if (riskLevel === "danger") {
+        let finalRiskName = "정상";
+
+        if (isDanger) {
             resHeader.className = 'result-header danger-header';
             resBody.className = 'result-body danger-body';
-            resTitle.innerText = "🔴 십자인대/관절 부상 고위험군";
+            
+            if (dangerTags.length > 1) {
+                resTitle.innerText = "🔴 하체 관절 및 인대 복합 부상 고위험군";
+            } else {
+                resTitle.innerText = "🔴 " + dangerTags[0] + " 고위험군";
+            }
+            finalRiskName = "고위험";
+            
             document.getElementById('solution-container').style.display = 'block';
             document.getElementById('solution-content').innerHTML = `<ul>${solutions.join('')}</ul>`;
-        } else if (riskLevel === "warning") {
+            
+        } else if (isWarning) {
             resHeader.className = 'result-header warning-header';
             resBody.className = 'result-body warning-body';
-            resTitle.innerText = "🟡 부상 주의군 (밸런스 저하)";
+            
+            if (warningTags.length > 1) {
+                resTitle.innerText = "🟡 하체 복합 밸런스 불균형 주의군";
+            } else {
+                resTitle.innerText = "🟡 " + warningTags[0] + "군";
+            }
+            finalRiskName = "주의";
+            
             document.getElementById('solution-container').style.display = 'block';
             if(solutions.length === 0) {
-                document.getElementById('solution-content').innerHTML = `<ul><li><b>종합점수 미달:</b> 전체적인 근신경계 밸런스가 떨어져 있습니다. 워밍업 시 싱글 레그(한 발) 운동 비중을 높이세요.</li></ul>`;
+                document.getElementById('solution-content').innerHTML = `<ul><li><b>밸런스 주의:</b> 미세한 불균형이 감지되었습니다. 워밍업 시 싱글 레그(한 발) 운동 비중을 높이세요.</li></ul>`;
             } else {
                 document.getElementById('solution-content').innerHTML = `<ul>${solutions.join('')}</ul>`;
             }
+            
         } else {
             resHeader.className = 'result-header safe-header';
             resBody.className = 'result-body safe-body';
@@ -555,7 +581,7 @@
         window.currentData = {
             name: name, gender: gender, sport: sport, scoreR: r_score.toFixed(1), scoreL: l_score.toFixed(1),
             diffAT: diff_at.toFixed(1), diffPM: diff_pm.toFixed(1), diffPL: diff_pl.toFixed(1),
-            risk: riskLevel === "danger" ? "고위험" : (riskLevel === "warning" ? "주의" : "정상")
+            risk: finalRiskName
         };
     }
 
